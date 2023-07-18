@@ -12,14 +12,14 @@ local printHandler = require("xmlhandler/print")
 -- Defaults
 _print = nil
 _simpletree = nil
-_dom = nil 
+_dom = nil
 _file = nil
 _debug = nil
 _ws = nil
 _noentity = nil
 
 _usage = [[
-testxml.lua [-print] [-simpletree] [-dom] [-debug] 
+testxml.lua [-print] [-simpletree] [-dom] [-debug]
             [-ws] [-noentity] [-help] [file]
 ]]
 
@@ -72,16 +72,16 @@ while arg[index] do
         elseif arg[index] == "-help" then
             print(_usage)
             return
-        else 
+        else
             print(_usage)
             return
         end
-    else 
+    else
         -- Filename is last argument if present
         if arg[index+1] then
             print(_usage)
             return
-        else 
+        else
             _file = arg[index]
         end
     end
@@ -132,3 +132,4 @@ if _dom then
     xml2lua.printable(h.root)
     io.write( "-----------\n")
 end
+

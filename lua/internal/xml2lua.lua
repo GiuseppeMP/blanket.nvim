@@ -49,8 +49,7 @@
 --
 --@author Paul Chakravarti (paulc@passtheaardvark.com)
 --@author Manoel Campos da Silva Filho
-local xml2lua = {_VERSION = "1.5-2"}
--- local XmlParser = require("XmlParser")
+local xml2lua = { _VERSION = "1.6-1" }
 local XmlParser = require("internal.XmlParser")
 
 ---Recursivelly prints a table in an easy-to-ready format
@@ -58,18 +57,18 @@ local XmlParser = require("internal.XmlParser")
 --@param level the indentation level to start with
 local function printableInternal(tb, level)
   if tb == nil then
-     return
+    return
   end
 
   level = level or 1
-  local spaces = string.rep(' ', level*2)
-  for k,v in pairs(tb) do
-      if type(v) == "table" then
-         print(spaces .. k)
-         printableInternal(v, level+1)
-      else
-         print(spaces .. k..'='..v)
-      end
+  local spaces = string.rep(' ', level * 2)
+  for k, v in pairs(tb) do
+    if type(v) == "table" then
+      print(spaces .. k)
+      printableInternal(v, level + 1)
+    else
+      print(spaces .. k .. '=' .. v)
+    end
   end
 end
 
@@ -81,26 +80,26 @@ end
 --@return a XmlParser object used to parse the XML
 --@see XmlParser
 function xml2lua.parser(handler)
-    if handler == xml2lua then
-        error("You must call xml2lua.parse(handler) instead of xml2lua:parse(handler)")
+  if handler == xml2lua then
+    error("You must call xml2lua.parse(handler) instead of xml2lua:parse(handler)")
+  end
+
+  local options = {
+    --Indicates if whitespaces should be striped or not
+    stripWS = 1,
+    expandEntities = 1,
+    errorHandler = function(errMsg, pos)
+      error(string.format("%s [char=%d]\n", errMsg or "Parse Error", pos))
     end
+  }
 
-    local options = {
-            --Indicates if whitespaces should be striped or not
-            stripWS = 1,
-            expandEntities = 1,
-            errorHandler = function(errMsg, pos)
-                error(string.format("%s [char=%d]\n", errMsg or "Parse Error", pos))
-            end
-          }
-
-    return XmlParser.new(handler, options)
+  return XmlParser.new(handler, options)
 end
 
 ---Recursivelly prints a table in an easy-to-ready format
 --@param tb The table to be printed
 function xml2lua.printable(tb)
-    printableInternal(tb)
+  printableInternal(tb)
 end
 
 ---Handler to generate a string prepresentation of a table
@@ -108,37 +107,37 @@ end
 --@param t Table to be parsed
 --@return a string representation of the table
 function xml2lua.toString(t)
-    local sep = ''
-    local res = ''
-    if type(t) ~= 'table' then
-        return t
-    end
+  local sep = ''
+  local res = ''
+  if type(t) ~= 'table' then
+    return t
+  end
 
-    for k,v in pairs(t) do
-        if type(v) == 'table' then
-            v = xml2lua.toString(v)
-        end
-        res = res .. sep .. string.format("%s=%s", k, v)
-        sep = ','
+  for k, v in pairs(t) do
+    if type(v) == 'table' then
+      v = xml2lua.toString(v)
     end
-    res = '{'..res..'}'
+    res = res .. sep .. string.format("%s=%s", k, v)
+    sep = ','
+  end
+  res = '{' .. res .. '}'
 
-    return res
+  return res
 end
 
 --- Loads an XML file from a specified path
 -- @param xmlFilePath the path for the XML file to load
 -- @return the XML loaded file content
 function xml2lua.loadFile(xmlFilePath)
-    local f, e = io.open(xmlFilePath, "r")
-    if f then
-        --Gets the entire file content and stores into a string
-        local content = f:read("*a")
-        f:close()
-        return content
-    end
+  local f, e = io.open(xmlFilePath, "r")
+  if f then
+    --Gets the entire file content and stores into a string
+    local content = f:read("*a")
+    f:close()
+    return content
+  end
 
-    error(e)
+  error(e)
 end
 
 ---Gets an _attr element from a table that represents the attributes of an XML tag,
@@ -152,47 +151,111 @@ local function attrToXml(attrTable)
   attrTable = attrTable or {}
 
   for k, v in pairs(attrTable) do
-      s = s .. " " .. k .. "=" .. '"' .. v .. '"'
+    s = s .. " " .. k .. "=" .. '"' .. v .. '"'
   end
   return s
 end
 
 ---Gets the first key of a given table
-local function getFirstKey(tb)
-   if type(tb) == "table" then
-      for k, _ in pairs(tb) do
-          return k
-      end
-      return nil
-   end
-
-   return tb
+local function getSingleChild(tb)
+  local count = 0
+  for _ in pairs(tb) do
+    count = count + 1
+  end
+  if (count == 1) then
+    for k, _ in pairs(tb) do
+      return k
+    end
+  end
+  return nil
 end
 
---- Parses a given entry in a lua table
--- and inserts it as a XML string into a destination table.
--- Entries in such a destination table will be concatenated to generated
--- the final XML string from the origin table.
--- @param xmltb the destination table where the XML string from the parsed key will be inserted
--- @param tagName the name of the table field that will be used as XML tag name
--- @param fieldValue a field from the lua table to be recursively parsed to XML or a primitive value that will be enclosed in a tag name
--- @param level a int value used to include indentation in the generated XML from the table key
-local function parseTableKeyToXml(xmltb, tagName, fieldValue, level)
-    local spaces = string.rep(' ', level*2)
-
-    local strValue, attrsStr = "", ""
-    if type(fieldValue) == "table" then
-        attrsStr = attrToXml(fieldValue._attr)
-        fieldValue._attr = nil
-        --If after removing the _attr field there is just one element inside it,
-        --the tag was enclosing a single primitive value instead of other inner tags.
-        strValue = #fieldValue == 1 and spaces..tostring(fieldValue[1]) or xml2lua.toXml(fieldValue, tagName, level+1)
-        strValue = '\n'..strValue..'\n'..spaces
-    else
-        strValue = tostring(fieldValue)
+---Gets the first value of a given table
+local function getFirstValue(tb)
+  if type(tb) == "table" then
+    for _, v in pairs(tb) do
+      return v
     end
+    return nil
+  end
 
-    table.insert(xmltb, spaces..'<'..tagName.. attrsStr ..'>'..strValue..'</'..tagName..'>')
+  return tb
+end
+
+xml2lua.pretty = true
+
+function xml2lua.getSpaces(level)
+  local spaces = ''
+  if (xml2lua.pretty) then
+    spaces = string.rep(' ', level * 2)
+  end
+  return spaces
+end
+
+function xml2lua.addTagValueAttr(tagName, tagValue, attrTable, level)
+  local attrStr = attrToXml(attrTable)
+  local spaces = xml2lua.getSpaces(level)
+  if (tagValue == '') then
+    table.insert(xml2lua.xmltb, spaces .. '<' .. tagName .. attrStr .. '/>')
+  else
+    table.insert(xml2lua.xmltb,
+      spaces .. '<' .. tagName .. attrStr .. '>' .. tostring(tagValue) .. '</' .. tagName .. '>')
+  end
+end
+
+function xml2lua.startTag(tagName, attrTable, level)
+  local attrStr = attrToXml(attrTable)
+  local spaces = xml2lua.getSpaces(level)
+  if (tagName ~= nil) then
+    table.insert(xml2lua.xmltb, spaces .. '<' .. tagName .. attrStr .. '>')
+  end
+end
+
+function xml2lua.endTag(tagName, level)
+  local spaces = xml2lua.getSpaces(level)
+  if (tagName ~= nil) then
+    table.insert(xml2lua.xmltb, spaces .. '</' .. tagName .. '>')
+  end
+end
+
+function xml2lua.isChildArray(obj)
+  for tag, _ in pairs(obj) do
+    if (type(tag) == 'number') then
+      return true
+    end
+  end
+  return false
+end
+
+function xml2lua.isTableEmpty(obj)
+  for k, _ in pairs(obj) do
+    if (k ~= '_attr') then
+      return false
+    end
+  end
+  return true
+end
+
+function xml2lua.parseTableToXml(obj, tagName, level)
+  if (tagName ~= '_attr') then
+    if (type(obj) == 'table') then
+      if (xml2lua.isChildArray(obj)) then
+        for _, value in pairs(obj) do
+          xml2lua.parseTableToXml(value, tagName, level)
+        end
+      elseif xml2lua.isTableEmpty(obj) then
+        xml2lua.addTagValueAttr(tagName, "", obj._attr, level)
+      else
+        xml2lua.startTag(tagName, obj._attr, level)
+        for tag, value in pairs(obj) do
+          xml2lua.parseTableToXml(value, tag, level + 1)
+        end
+        xml2lua.endTag(tagName, level)
+      end
+    else
+      xml2lua.addTagValueAttr(tagName, obj, nil, level)
+    end
+  end
 end
 
 ---Converts a Lua table to a XML String representation.
@@ -204,52 +267,21 @@ end
 --
 --@return a String representing the table content in XML
 function xml2lua.toXml(tb, tableName, level)
-  level = level or 1
-  local firstLevel = level
-  tableName = tableName or ''
-  local xmltb = (tableName ~= '' and level == 1) and {'<'..tableName..attrToXml(tb._attr)..'>'} or {}
-  tb._attr = nil
+  xml2lua.xmltb = {}
+  level = level or 0
+  local singleChild = getSingleChild(tb)
+  tableName = tableName or singleChild
 
-  for k, v in pairs(tb) do
-      if type(v) == 'table' then
-         -- If the key is a number, the given table is an array and the value is an element inside that array.
-         -- In this case, the name of the array is used as tag name for each element.
-         -- So, we are parsing an array of objects, not an array of primitives.
-         if type(k) == 'number' then
-            parseTableKeyToXml(xmltb, tableName, v, level)
-         else
-            level = level + 1
-            -- If the type of the first key of the value inside the table
-            -- is a number, it means we have a HashTable-like structure,
-            -- in this case with keys as strings and values as arrays.
-            if type(getFirstKey(v)) == 'number' then
-                for sub_k, sub_v in pairs(v) do
-                    if sub_k ~= '_attr' then
-                      local sub_v_with_attr = type(v._attr) == 'table' and { sub_v, _attr = v._attr } or sub_v
-                      parseTableKeyToXml(xmltb, k, sub_v_with_attr, level)
-                    end
-                end
-            else
-               -- Otherwise, the "HashTable" values are objects
-               parseTableKeyToXml(xmltb, k, v, level)
-            end
-         end
-      else
-         -- When values are primitives:
-         -- If the type of the key is number, the value is an element from an array.
-         -- In this case, uses the array name as the tag name.
-         if type(k) == 'number' then
-            k = tableName
-         end
-         parseTableKeyToXml(xmltb, k, v, level)
-      end
+  if (singleChild) then
+    xml2lua.parseTableToXml(getFirstValue(tb), tableName, level)
+  else
+    xml2lua.parseTableToXml(tb, tableName, level)
   end
 
-  if tableName ~= '' and firstLevel == 1 then
-      table.insert(xmltb, '</'..tableName..'>\n')
+  if (xml2lua.pretty) then
+    return table.concat(xml2lua.xmltb, '\n')
   end
-
-  return table.concat(xmltb, '\n')
+  return table.concat(xml2lua.xmltb)
 end
 
 return xml2lua
